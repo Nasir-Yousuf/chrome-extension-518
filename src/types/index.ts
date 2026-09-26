@@ -62,9 +62,9 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
     'reddit.com',
     'netflix.com'
   ],
-  redirectMode: 'blocked_page',
-  targetUrl: 'https://notion.so',
-  interceptSearch: false,
+  redirectMode: 'direct', // Direct redirection by default (no intermediate screen)
+  targetUrl: 'https://notion.so', // Target URL where unapproved visits & searches land
+  interceptSearch: true, // Automatically redirect search queries to target URL
   customGoal: 'Focus on high-value development and study',
   pomodoro: {
     isActive: false,

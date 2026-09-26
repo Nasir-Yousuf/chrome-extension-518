@@ -11,11 +11,14 @@ import {
   CheckCircle2, 
   Play, 
   Square,
-  ArrowRight
+  ArrowRight,
+  Search,
+  Save,
+  Check
 } from 'lucide-react';
 import { ExtensionSettings, DEFAULT_SETTINGS } from '../types';
 import { getSettings, saveSettings, onSettingsChanged } from '../utils/storage';
-import { normalizeDomain, matchesDomainPattern } from '../utils/url-matcher';
+import { normalizeDomain, matchesDomainPattern, formatValidUrl } from '../utils/url-matcher';
 
 export default function PopupApp() {
   const [settings, setSettings] = useState<ExtensionSettings>(DEFAULT_SETTINGS);
@@ -23,17 +26,21 @@ export default function PopupApp() {
   const [currentDomain, setCurrentDomain] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const [editingTargetUrl, setEditingTargetUrl] = useState<string>('');
+  const [targetSavedToast, setTargetSavedToast] = useState<boolean>(false);
 
   useEffect(() => {
     // Load initial settings
     getSettings().then((s) => {
       setSettings(s);
+      setEditingTargetUrl(s.targetUrl);
       setLoading(false);
     });
 
     // Subscribe to settings changes
     const unsubscribe = onSettingsChanged((newSettings) => {
       setSettings(newSettings);
+      setEditingTargetUrl(newSettings.targetUrl);
     });
 
     // Get current active tab
@@ -83,6 +90,22 @@ export default function PopupApp() {
     await saveSettings(updated);
   };
 
+  const handleSaveTargetUrl = async () => {
+    const cleanUrl = formatValidUrl(editingTargetUrl);
+    const updated = { ...settings, targetUrl: cleanUrl };
+    setSettings(updated);
+    setEditingTargetUrl(cleanUrl);
+    await saveSettings(updated);
+    setTargetSavedToast(true);
+    setTimeout(() => setTargetSavedToast(false), 2000);
+  };
+
+  const handleToggleSearchIntercept = async () => {
+    const updated = { ...settings, interceptSearch: !settings.interceptSearch };
+    setSettings(updated);
+    await saveSettings(updated);
+  };
+
   const isCurrentDomainAllowed = currentDomain
     ? settings.allowedDomains.some((d) => matchesDomainPattern(`https://${currentDomain}`, d))
     : false;
@@ -111,11 +134,14 @@ export default function PopupApp() {
     await saveSettings(updated);
   };
 
-  const handleSetAsTarget = async () => {
+  const handleSetCurrentTabAsTarget = async () => {
     if (!currentTabUrl) return;
     const updated = { ...settings, targetUrl: currentTabUrl };
     setSettings(updated);
+    setEditingTargetUrl(currentTabUrl);
     await saveSettings(updated);
+    setTargetSavedToast(true);
+    setTimeout(() => setTargetSavedToast(false), 2000);
   };
 
   const handleStartPomodoro = async (minutes: number) => {
@@ -155,8 +181,7 @@ export default function PopupApp() {
   };
 
   const openTargetSite = () => {
-    let target = settings.targetUrl || 'https://notion.so';
-    if (!/^https?:\/\//i.test(target)) target = `https://${target}`;
+    const target = formatValidUrl(settings.targetUrl || 'https://notion.so');
     if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
       chrome.tabs.create({ url: target });
     } else {
@@ -194,27 +219,25 @@ export default function PopupApp() {
               FocusGuard
             </h3>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              {settings.mode === 'whitelist' ? 'Strict Whitelist Mode' : 'Blacklist Mode'}
+              Direct Smart Redirector
             </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button 
-            onClick={openOptionsPage}
-            className="btn-icon"
-            title="Open Settings Dashboard"
-          >
-            <Settings size={16} />
-          </button>
-        </div>
+        <button 
+          onClick={openOptionsPage}
+          className="btn-icon"
+          title="Open Full Settings Dashboard"
+        >
+          <Settings size={16} />
+        </button>
       </div>
 
       {/* Main Status & Toggle Card */}
       <div 
         className={`card ${settings.isEnabled ? 'card-glow' : ''}`}
         style={{
-          padding: '14px 16px',
+          padding: '12px 14px',
           background: settings.isEnabled 
             ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(17, 24, 39, 0.8) 100%)' 
             : 'var(--bg-glass-card)',
@@ -223,7 +246,7 @@ export default function PopupApp() {
           justifyContent: 'space-between'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             width: '10px',
             height: '10px',
@@ -232,13 +255,11 @@ export default function PopupApp() {
             boxShadow: settings.isEnabled ? '0 0 10px var(--success)' : 'none'
           }} />
           <div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              {settings.isEnabled ? 'Protection Active' : 'Protection Paused'}
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              {settings.isEnabled ? 'Redirection Active' : 'Redirection Paused'}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-              {settings.isEnabled 
-                ? (settings.mode === 'whitelist' ? 'Only allowed sites can open' : 'Distractions blocked') 
-                : 'All sites currently accessible'}
+              {settings.isEnabled ? 'Directly taking you to target URL' : 'Standard browsing allowed'}
             </div>
           </div>
         </div>
@@ -253,17 +274,17 @@ export default function PopupApp() {
         </label>
       </div>
 
-      {/* Quick Redirect Target Card */}
-      <div className="card" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {/* Primary Target Website Card (Editable in Popup) */}
+      <div className="card" style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Redirect Destination
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary-light)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Compass size={13} /> Destination Website
           </span>
           <button 
             onClick={openTargetSite}
             style={{ 
               background: 'none', 
-              color: 'var(--primary-light)', 
+              color: 'var(--text-secondary)', 
               fontSize: '11px', 
               display: 'flex', 
               alignItems: 'center', 
@@ -271,156 +292,147 @@ export default function PopupApp() {
               fontWeight: 600
             }}
           >
-            Open <ExternalLink size={11} />
+            Visit <ExternalLink size={11} />
           </button>
         </div>
-        
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          background: 'var(--bg-surface)',
-          padding: '8px 10px',
-          borderRadius: 'var(--radius-sm)',
-          border: '1px solid var(--border-subtle)'
-        }}>
-          <Compass size={15} color="var(--primary-light)" />
-          <span style={{ 
-            fontSize: '12px', 
-            fontFamily: 'var(--font-mono)', 
-            color: 'var(--text-primary)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            flex: 1
-          }}>
-            {settings.targetUrl || 'https://notion.so'}
-          </span>
+
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="https://notion.so or https://github.com"
+            value={editingTargetUrl}
+            onChange={(e) => setEditingTargetUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSaveTargetUrl()}
+            style={{ fontSize: '12px', padding: '8px 10px', fontFamily: 'var(--font-mono)' }}
+          />
+          <button 
+            onClick={handleSaveTargetUrl}
+            className="btn btn-primary btn-sm"
+            style={{ padding: '0 12px' }}
+            title="Save destination URL"
+          >
+            {targetSavedToast ? <Check size={14} color="#FFF" /> : <Save size={14} />}
+          </button>
         </div>
+
+        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+          Any search or unapproved URL will immediately open this site.
+        </span>
+      </div>
+
+      {/* Search & Omnibox Interception Quick Switch */}
+      <div className="card" style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Search size={14} color="var(--accent-cyan)" />
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Redirect All Chrome Searches
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+              Take to target site when searching in address bar
+            </div>
+          </div>
+        </div>
+
+        <label className="toggle-switch" style={{ width: '40px', height: '22px' }}>
+          <input 
+            type="checkbox" 
+            checked={settings.interceptSearch} 
+            onChange={handleToggleSearchIntercept} 
+          />
+          <span className="toggle-slider"></span>
+        </label>
       </div>
 
       {/* Current Tab Quick Action */}
       {currentDomain && !currentDomain.startsWith('chrome') && (
-        <div className="card" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div className="card" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Current Website
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+              <Globe size={13} color="var(--text-secondary)" />
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {currentDomain}
+              </span>
+            </div>
             {isCurrentDomainAllowed ? (
-              <span className="badge badge-success">
-                <CheckCircle2 size={10} /> Allowed
+              <span className="badge badge-success" style={{ fontSize: '10px', padding: '2px 8px' }}>
+                <CheckCircle2 size={9} /> Allowed
               </span>
             ) : (
-              <span className="badge badge-danger">
-                <ShieldAlert size={10} /> Restricted
+              <span className="badge badge-danger" style={{ fontSize: '10px', padding: '2px 8px' }}>
+                <ShieldAlert size={9} /> Redirects
               </span>
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Globe size={14} color="var(--text-secondary)" />
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {currentDomain}
-            </span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '2px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
             {isCurrentDomainAllowed ? (
               <button 
                 onClick={handleRemoveCurrentDomain}
                 className="btn btn-danger btn-sm"
+                style={{ fontSize: '11px', padding: '6px 4px' }}
               >
-                Remove from Allowlist
+                Block / Redirect
               </button>
             ) : (
               <button 
                 onClick={handleAddCurrentDomain}
                 className="btn btn-primary btn-sm"
+                style={{ fontSize: '11px', padding: '6px 4px' }}
               >
-                <Plus size={13} /> Allow Website
+                <Plus size={12} /> Allow This Site
               </button>
             )}
             <button 
-              onClick={handleSetAsTarget}
+              onClick={handleSetCurrentTabAsTarget}
               className="btn btn-secondary btn-sm"
-              title="Set current website as redirect target for unapproved sites/searches"
+              style={{ fontSize: '11px', padding: '6px 4px' }}
+              title="Set this tab's URL as target destination"
             >
-              Set as Redirect Target
+              Set as Target
             </button>
           </div>
         </div>
       )}
 
-      {/* Focus Timer / Pomodoro Card */}
-      <div className="card" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Timer size={14} color="var(--accent-cyan)" />
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Deep Focus Session
-            </span>
-          </div>
-          {settings.pomodoro.isActive && (
-            <span className="badge badge-primary animate-glow" style={{ fontFamily: 'var(--font-mono)' }}>
-              {timeRemaining || 'Active'}
-            </span>
-          )}
+      {/* Focus Timer / Pomodoro */}
+      <div className="card" style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Timer size={14} color="var(--accent-cyan)" />
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            Focus Timer
+          </span>
         </div>
 
         {settings.pomodoro.isActive ? (
-          <button 
-            onClick={handleStopPomodoro}
-            className="btn btn-danger btn-sm"
-            style={{ width: '100%' }}
-          >
-            <Square size={12} /> End Focus Session
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="badge badge-primary animate-glow" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+              {timeRemaining || 'Active'}
+            </span>
+            <button onClick={handleStopPomodoro} className="btn btn-danger btn-sm" style={{ padding: '3px 8px' }}>
+              <Square size={10} /> Stop
+            </button>
+          </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-            <button 
-              onClick={() => handleStartPomodoro(25)}
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '11px', padding: '6px 4px' }}
-            >
-              <Play size={10} /> 25 min
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button onClick={() => handleStartPomodoro(25)} className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '10px' }}>
+              <Play size={9} /> 25m
             </button>
-            <button 
-              onClick={() => handleStartPomodoro(45)}
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '11px', padding: '6px 4px' }}
-            >
-              <Play size={10} /> 45 min
-            </button>
-            <button 
-              onClick={() => handleStartPomodoro(60)}
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '11px', padding: '6px 4px' }}
-            >
-              <Play size={10} /> 60 min
+            <button onClick={() => handleStartPomodoro(45)} className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '10px' }}>
+              <Play size={9} /> 45m
             </button>
           </div>
         )}
       </div>
 
-      {/* Quick Stats & Footer */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        padding: '0 4px',
-        fontSize: '11px',
-        color: 'var(--text-muted)'
-      }}>
-        <span>🛡️ Blocks today: <strong style={{ color: 'var(--text-primary)' }}>{settings.stats.blocksToday}</strong></span>
-        <span>📋 Allowed: <strong style={{ color: 'var(--text-primary)' }}>{settings.allowedDomains.length}</strong> sites</span>
-      </div>
-
+      {/* Footer link to options */}
       <button 
         onClick={openOptionsPage}
         className="btn btn-secondary"
-        style={{ width: '100%', fontSize: '12px' }}
+        style={{ width: '100%', fontSize: '12px', padding: '8px' }}
       >
-        Open Dashboard & Manage Whitelist <ArrowRight size={13} />
+        All Whitelist & Redirect Options <ArrowRight size={13} />
       </button>
     </div>
   );
