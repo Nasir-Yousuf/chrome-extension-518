@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   ShieldCheck, 
   ShieldAlert, 
@@ -11,7 +11,6 @@ import {
   CheckCircle2, 
   Play, 
   Square,
-  Sparkles,
   ArrowRight
 } from 'lucide-react';
 import { ExtensionSettings, DEFAULT_SETTINGS } from '../types';

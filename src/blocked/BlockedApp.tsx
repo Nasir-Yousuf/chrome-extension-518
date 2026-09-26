@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ShieldAlert,
   ArrowRight,
   Target,
-  Sparkles,
   Settings,
   Heart,
-  ExternalLink,
-  Lock,
   Plus
 } from 'lucide-react';
 import { ExtensionSettings, DEFAULT_SETTINGS } from '../types';

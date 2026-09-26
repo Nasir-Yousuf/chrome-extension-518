@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Shield,
   ShieldCheck,
@@ -22,7 +22,7 @@ import {
   Clock,
   Check
 } from 'lucide-react';
-import { ExtensionSettings, DEFAULT_SETTINGS, FilterMode, RedirectMode } from '../types';
+import { ExtensionSettings, DEFAULT_SETTINGS, FilterMode } from '../types';
 import { getSettings, saveSettings, onSettingsChanged } from '../utils/storage';
 import { normalizeDomain, matchesDomainPattern, formatValidUrl } from '../utils/url-matcher';
 

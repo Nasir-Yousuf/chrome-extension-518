@@ -24,10 +24,10 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        popup: resolve(__dirname, 'popup.html'),
-        options: resolve(__dirname, 'options.html'),
-        blocked: resolve(__dirname, 'blocked.html'),
-        background: resolve(__dirname, 'src/background/service-worker.ts')
+        popup: resolve(import.meta.dirname, 'popup.html'),
+        options: resolve(import.meta.dirname, 'options.html'),
+        blocked: resolve(import.meta.dirname, 'blocked.html'),
+        background: resolve(import.meta.dirname, 'src/background/service-worker.ts')
       },
       output: {
         entryFileNames: (chunkInfo) => {
